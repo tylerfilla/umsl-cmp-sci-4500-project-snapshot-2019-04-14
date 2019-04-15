@@ -4,7 +4,8 @@
  */
 
 #include <stdio.h>
+#include "version.h"
 
 int main() {
-  printf("Hello, world!\n");
+  printf("%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 }
