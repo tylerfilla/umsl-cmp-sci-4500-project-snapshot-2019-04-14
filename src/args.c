@@ -233,7 +233,7 @@ int args_read_next(struct args_cmd* root, struct args_state* state) {
           // Return flag option
           state->argi++;
           state->opt = opt;
-          state->opt_data = "yup";
+          state->opt_data = "1";
           free(opt_arg);
           return 1;
         }
@@ -302,7 +302,7 @@ int args_read_next(struct args_cmd* root, struct args_state* state) {
             // Return flag option
             state->argi++;
             state->opt = opt;
-            state->opt_data = "yas";
+            state->opt_data = "1";
             return 1;
           }
           case args_opt_kind_valued: {
