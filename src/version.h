@@ -23,4 +23,10 @@
     "." STRINGIFY(VERSION_MINOR)  \
     "." STRINGIFY(VERSION_PATCH)
 
+/** The Git HEAD commit hash at build time. */
+#define VERSION_GIT_COMMIT STRINGIFY(__git_hash)
+
+/** The Git refspec at build time. */
+#define VERSION_GIT_REFSPEC STRINGIFY(__git_refspec)
+
 #endif // #ifndef VERSION_H

@@ -128,6 +128,8 @@ static struct args_cmd CMD_GO = {
  */
 static void write_version(FILE* dest) {
   fprintf(dest, "%s " VERSION_NAME "\n", g->exec);
+  fprintf(dest, "built on " __DATE__ " at " __TIME__ "\n");
+  fprintf(dest, "commit " VERSION_GIT_COMMIT " (" VERSION_GIT_REFSPEC ")\n");
 }
 
 int main(int argc, char* argv[]) {
