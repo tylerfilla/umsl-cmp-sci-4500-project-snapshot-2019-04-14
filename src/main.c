@@ -10,6 +10,7 @@
 
 #include "args.h"
 #include "global.h"
+#include "version.h"
 
 #define CMD_KEY 1
 #define CMD_OPT_HELP_KEY 2
@@ -120,6 +121,15 @@ static struct args_cmd CMD_GO = {
   .options = NULL,
 };
 
+/**
+ * Write version information to a file.
+ *
+ * @param dest The destination file
+ */
+static void write_version(FILE* dest) {
+  fprintf(dest, "%s " VERSION_NAME "\n", g->exec);
+}
+
 int main(int argc, char* argv[]) {
   g_mut->argc = argc;
   g_mut->argv = (const char**) argv;
@@ -168,7 +178,8 @@ int main(int argc, char* argv[]) {
 
   // If version info is requested
   if (o_version) {
-    printf("version stuff\n");
+    // Print version info
+    write_version(stdout);
     return 0;
   }
 
