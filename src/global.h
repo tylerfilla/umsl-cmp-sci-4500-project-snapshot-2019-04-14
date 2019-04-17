@@ -13,6 +13,9 @@ struct global {
 
   /** The cmdline arg vector. */
   const char** argv;
+
+  /** The executable file name. */
+  const char* exec;
 };
 
 #ifdef __cplusplus

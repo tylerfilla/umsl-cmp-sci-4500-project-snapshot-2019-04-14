@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <libgen.h>
+
 #include "args.h"
 #include "global.h"
 
@@ -121,6 +123,7 @@ static struct args_cmd CMD_GO = {
 int main(int argc, char* argv[]) {
   g_mut->argc = argc;
   g_mut->argv = (const char**) argv;
+  g_mut->exec = basename(argv[0]);
 
   int o_help = 0;
   int o_version = 0;

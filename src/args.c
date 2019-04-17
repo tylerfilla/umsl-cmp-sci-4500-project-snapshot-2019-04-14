@@ -151,8 +151,8 @@ static char* args__write_header_and_get_full_name(FILE* dest, struct args_cmd* c
   // Get full name of command
   char* full_name = args__cmd_full_name(cmd);
 
-  fprintf(dest, "usage: cozmo%s <command> [<args>]\n", full_name);
-  fprintf(dest, "   or: cozmo%s <opts>\n", full_name);
+  fprintf(dest, "usage: %s%s <command> [<args>]\n", g->exec, full_name);
+  fprintf(dest, "   or: %s%s <opts>\n", g->exec, full_name);
 
   return full_name;
 }
@@ -283,6 +283,10 @@ int args_read_next(struct args_cmd* root, struct args_state* state) {
     // Loop through useful characters in option
     // By useful, we skip the hyphen character
     for (size_t i = 1; i < arg_len; ++i) {
+      // FIXME(tyler): I copy-pasted this from another project that didn't use a getopt-style API.
+      //   As such, this for loop has no effect. All branches inside it return.
+      //   Right now, compounds don't parse: If user gives -abc, only the 'a' will parse.
+
       // The character under consideration
       char c = arg[i];
 
@@ -465,7 +469,7 @@ int args_write_usage(FILE* dest, struct args_cmd* cmd) {
   char* full_name = args__write_header_and_get_full_name(dest, cmd);
 
   // Tell the user to refer to the help text
-  fprintf(dest, "\ntry `cozmo%s -h' for more info\n", full_name);
+  fprintf(dest, "\ntry `%s%s -h' for more info\n", g->exec, full_name);
 
   free(full_name);
   return 0;
