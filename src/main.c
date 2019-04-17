@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <libgen.h>
@@ -12,14 +13,22 @@
 #include "global.h"
 #include "version.h"
 
-#define CMD_KEY 1
-#define CMD_OPT_HELP_KEY 2
-#define CMD_OPT_VERSION_KEY 3
-#define CMD_FRIEND_KEY 4
-#define CMD_FRIEND_OPT_FRIEND_ID_KEY 5
-#define CMD_FRIEND_LIST_KEY 6
-#define CMD_FRIEND_REMOVE_KEY 7
-#define CMD_GO_KEY 8
+enum {
+  CMD_KEY,
+  CMD_OPT_HELP_KEY,
+  CMD_OPT_VERSION_KEY,
+  CMD_OPT_LEGAL_KEY,
+  CMD_OPT_SQL_ADDR,
+  CMD_OPT_SQL_USER,
+  CMD_OPT_SQL_PASS,
+  CMD_OPT_SQL_DATA,
+  CMD_FRIEND_KEY,
+  CMD_FRIEND_OPT_FRIEND_ID_KEY,
+  CMD_FRIEND_LIST_KEY,
+  CMD_FRIEND_REMOVE_KEY,
+  CMD_GO_KEY,
+  CMD_GO_OPT_DEVICES_KEY,
+};
 
 static struct args_cmd CMD;
 static struct args_cmd CMD_FRIEND;
@@ -39,7 +48,7 @@ static struct args_cmd CMD = {
     &CMD_FRIEND,
     &CMD_GO,
   },
-  .num_options = 2,
+  .num_options = 7,
   .options = (struct args_opt* []) {
     &(struct args_opt) {
       .key = CMD_OPT_HELP_KEY,
@@ -54,6 +63,41 @@ static struct args_cmd CMD = {
       .desc = "show version information",
       .num_aliases = 1,
       .aliases = (const char* []) {"--version"},
+    },
+    &(struct args_opt) {
+      .key = CMD_OPT_LEGAL_KEY,
+      .kind = args_opt_kind_flag,
+      .desc = "show legal information",
+      .num_aliases = 1,
+      .aliases = (const char* []) {"--legal"},
+    },
+    &(struct args_opt) {
+      .key = CMD_OPT_SQL_ADDR,
+      .kind = args_opt_kind_valued,
+      .desc = "the sql server address",
+      .num_aliases = 1,
+      .aliases = (const char* []) {"--sql-addr"},
+    },
+    &(struct args_opt) {
+      .key = CMD_OPT_SQL_USER,
+      .kind = args_opt_kind_valued,
+      .desc = "the sql connection username",
+      .num_aliases = 1,
+      .aliases = (const char* []) {"--sql-user"},
+    },
+    &(struct args_opt) {
+      .key = CMD_OPT_SQL_PASS,
+      .kind = args_opt_kind_valued,
+      .desc = "the sql connection password",
+      .num_aliases = 1,
+      .aliases = (const char* []) {"--sql-pass"},
+    },
+    &(struct args_opt) {
+      .key = CMD_OPT_SQL_DATA,
+      .kind = args_opt_kind_valued,
+      .desc = "the sql database",
+      .num_aliases = 1,
+      .aliases = (const char* []) {"--sql-data"},
     },
   },
 };
@@ -117,8 +161,16 @@ static struct args_cmd CMD_GO = {
   .aliases = (const char* []) {"go"},
   .num_commands = 0,
   .commands = NULL,
-  .num_options = 0,
-  .options = NULL,
+  .num_options = 1,
+  .options = (struct args_opt* []) {
+    &(struct args_opt) {
+      .key = CMD_GO_OPT_DEVICES_KEY,
+      .kind = args_opt_kind_valued,
+      .desc = "comma-separated list of cozmo serial numbers",
+      .num_aliases = 2,
+      .aliases = (const char* []) {"-D", "--devices"},
+    },
+  },
 };
 
 /**
@@ -132,78 +184,119 @@ static void write_version(FILE* dest) {
   fprintf(dest, "commit " VERSION_GIT_COMMIT " (" VERSION_GIT_REFSPEC ")\n");
 }
 
+/**
+ * Write legal information to a file.
+ *
+ * @param dest The destination file
+ */
+static void write_legal(FILE* dest) {
+  fprintf(dest, "Copyright 2019 The Cozmonaut Contributors\n");
+}
+
 int main(int argc, char* argv[]) {
   g_mut->argc = argc;
   g_mut->argv = (const char**) argv;
   g_mut->exec = basename(argv[0]);
 
+  // Whether to print help info
+  // Applies to all commands
   int o_help = 0;
+
+  // Whether to print version info
+  // Applies to all commands
   int o_version = 0;
-  const char* o_friend_id = "";
+
+  // Whether to print legal info
+  // Applies to all commands
+  int o_legal = 0;
+
+  // The friend ID
+  // Applies all "friend" commands
+  long o_friend_id = -1;
+
+  // The Cozmo device list
+  // Applies to the "go" command
+  const char* o_devices = "";
 
   // Read command-line arguments
   struct args_state state = {};
   while (args_read_next(&CMD, &state)) {
-    if (state.cmd) {
-      if (state.opt) {
-        if (state.opt->key == CMD_OPT_HELP_KEY) {
+    if (state.cmd && state.opt) {
+      switch (state.opt->key) {
+        case CMD_OPT_HELP_KEY:
           o_help = 1;
-        } else if (state.opt->key == CMD_OPT_VERSION_KEY) {
-          o_version = 1;
-        }
-      }
-
-      switch (state.cmd->key) {
-        case CMD_KEY:
           break;
-        case CMD_FRIEND_KEY:
-        case CMD_FRIEND_LIST_KEY:
-        case CMD_FRIEND_REMOVE_KEY:
-          if (state.opt) {
-            if (state.opt->key == CMD_FRIEND_OPT_FRIEND_ID_KEY) {
-              o_friend_id = state.opt_data;
+        case CMD_OPT_VERSION_KEY:
+          o_version = 1;
+          break;
+        case CMD_OPT_LEGAL_KEY:
+          o_legal = 1;
+          break;
+        case CMD_FRIEND_OPT_FRIEND_ID_KEY:
+          switch (state.cmd->key) {
+            case CMD_FRIEND_KEY:
+            case CMD_FRIEND_LIST_KEY:
+            case CMD_FRIEND_REMOVE_KEY: {
+              char** end = (char**) &state.opt_data;
+              o_friend_id = strtol(state.opt_data, end, 10);
+              if (*end != state.opt_data + strlen(state.opt_data)) {
+                fprintf(stderr, "malformed friend id: %s\n", state.opt_data);
+                return 1;
+              }
+              break;
             }
           }
           break;
-        case CMD_GO_KEY:
+        case CMD_GO_OPT_DEVICES_KEY:
+          o_devices = state.opt_data;
           break;
       }
     }
   }
 
-  // If help info is requested
+  // Print help info if requested
   if (o_help) {
-    // Print help for command
     args_write_help(stdout, state.cmd);
     return 0;
   }
 
-  // If version info is requested
+  // Print version info if requested
   if (o_version) {
-    // Print version info
     write_version(stdout);
+    return 0;
+  }
+
+  // Print legal info if requested
+  if (o_legal) {
+    write_legal(stdout);
     return 0;
   }
 
   // Dispatch based on fully-formed command
   if (state.cmd) {
-    if (state.cmd->key == CMD_FRIEND_LIST_KEY) {
-      printf("friend list: %s\n", o_friend_id);
-    } else if (state.cmd->key == CMD_FRIEND_REMOVE_KEY) {
-      printf("friend remove: %s\n", o_friend_id);
-    } else if (state.cmd->key == CMD_GO_KEY) {
-      printf("go\n");
-    } else {
-      if (state.err) {
-        // Presumably an error message was shown, so give it some space
-        fprintf(stderr, "\n");
+    switch (state.cmd->key) {
+      case CMD_FRIEND_LIST_KEY:
+        printf("friend list: %ld\n", o_friend_id);
+        break;
+      case CMD_FRIEND_REMOVE_KEY:
+        printf("friend remove: %ld\n", o_friend_id);
+        break;
+      case CMD_GO_KEY:
+        printf("go with %s cozmos\n", o_devices);
+        break;
+      default:
+        if (state.err) {
+          // Presumably, an error message was printed
+          // Add a new line between it and the usage text
+          fprintf(stderr, "\n");
 
-        // Write usage text to stderr
-        args_write_usage(stderr, state.cmd);
-      } else {
-        // Write usage text to stdout
-        args_write_usage(stdout, state.cmd);
-      }
+          // Write usage text to stderr
+          args_write_usage(stderr, state.cmd);
+        } else {
+          // Write usage text to stdout
+          args_write_usage(stdout, state.cmd);
+        }
+        break;
     }
   }
 }
