@@ -13,6 +13,9 @@ include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_HASH)
 
 set(cozmo_SRC_FILES
+        src/op/friend_list.c
+        src/op/friend_remove.c
+        src/op/go.c
         src/args.c
         src/global.c
         src/main.c
