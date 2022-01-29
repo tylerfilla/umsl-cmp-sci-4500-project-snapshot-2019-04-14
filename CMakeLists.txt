@@ -8,6 +8,9 @@ project(cozmonaut)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
+find_package(PythonInterp 3.5 REQUIRED)
+find_package(PythonLibs 3.5 REQUIRED)
+
 include(GetGitRevisionDescription)
 
 get_git_head_revision(GIT_REFSPEC GIT_HASH)
@@ -27,6 +30,8 @@ set(cozmo_VERSION_PATCH 0)
 
 add_executable(cozmo ${cozmo_SRC_FILES})
 set_target_properties(cozmo PROPERTIES C_STANDARD 99)
+target_include_directories(cozmo PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(cozmo PRIVATE ${PYTHON_LIBRARY})
 
 target_compile_definitions(cozmo PRIVATE
         -D__git_hash=${GIT_HASH}
