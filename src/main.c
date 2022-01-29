@@ -11,6 +11,8 @@
 
 #include "args.h"
 #include "global.h"
+#include "log.h"
+#include "log_args.h"
 #include "version.h"
 
 enum {
@@ -271,6 +273,20 @@ int main(int argc, char* argv[]) {
     write_legal(stdout);
     return 0;
   }
+
+  struct log* log = log_new(&(struct log_attrs) {.name = "asdf"});
+  struct log_context* ctx = log_context_new(&(struct log_context_attrs) {.name = "qwerty"});
+
+  log_register_context(log, ctx);
+  log_context_make_current(ctx);
+
+  LOGD("this is a debug record!");
+  LOGI("this is an {} {}!", _str("info"), _str("record"));
+  LOGI("this {} has an integer: {}", _str("record"), _i(1234));
+  LOGI("this is a thing: {}", _s(1));
+
+  log_unregister_context(log, ctx);
+  log_delete(log);
 
   // Dispatch based on fully-formed command
   if (state.cmd) {
