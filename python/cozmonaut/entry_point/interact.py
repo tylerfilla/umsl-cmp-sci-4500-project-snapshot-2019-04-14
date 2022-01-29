@@ -5,10 +5,9 @@
 
 import asyncio
 
-# The module base will be implemented in C code
-import base
-import cv2
+import cozmo
 
+import base
 from cozmonaut.entry_point import EntryPoint
 
 
@@ -18,46 +17,80 @@ class EntryPointInteract(EntryPoint):
     """
 
     def __init__(self):
-        # self.server = base.get_server()
-        self.stop = False
+        self.stopping = False
 
-    async def demo_video(self):
+    async def face_handler(self, robot: cozmo.robot.Robot, server: base.Server, track: base.FaceTrack):
+        ident = await track.identify()
+
+    async def face_loop(self, robot: cozmo.robot.Robot, server: base.Server):
         """
-        This coroutine grabs video frames. It's job is to go as fast as it can.
-        When we start integrating Cozmos, we will have one coroutine per Cozmo
-        robot, and we will not need to grab frames ourselves. Instead, the SDK
-        will give us frames via its frame callback. Not a big change at all.
+        Continually watch for new face tracks.
+
+        :param robot: The Cozmo robot
+        :param server: The server
         """
 
-        # Open the first video device
-        cap = cv2.VideoCapture(0)
+        while not self.stopping:
+            # Wait for a new face track
+            track = await server.next_track()
 
-        while not self.stop:
-            # Read a video frame
-            ret, frame = cap.read()
-
-            # Show the frame
-            cv2.imshow('Output', frame)
-
-            # Update window and stop on Q key down
-            if cv2.waitKey(1) == ord('q'):
-                self.stop = True
+            await self.face_handler()
 
             # Yield control
             await asyncio.sleep(0)
 
-    async def demo_faces(self):
+    async def sensor_monitor(self, robot: cozmo.robot.Robot, server: base.Server):
         """
-        This coroutine is designed to take its time handling faces. It will not
-        bring the video coroutine above down in this demo, and it likewise will
-        not bring Cozmo down in production.
+        This is a coroutine that monitors Cozmo sensor data. Specifically, it
+        polls the sensors and pushes values to the server.
+
+        @param robot The Cozmo robot
+        @param server The server
         """
 
-        while not self.stop:
-            # TODO: Wait for faces
+        while not self.stopping:
+            # Actuator feedback senses
+            server.push_motor_rate_left(robot.left_wheel_speed.speed_mmps)
+            server.push_motor_rate_right(robot.right_wheel_speed.speed_mmps)
+
+            # Motion senses
+            server.push_accel(robot.accelerometer.x_y_z)
+            server.push_gyro(robot.gyro.x_y_z)
+
+            # Power senses
+            server.push_battery_voltage(robot.battery_voltage)
+            server.push_charging(robot.is_charging)
+
+            # Computed position and rotation
+            # These are relative to the Cozmo app's internal map
+            server.push_relative_origin_id(robot.pose.origin_id)
+            server.push_relative_position(robot.pose.position.x_y_z)
+            server.push_relative_rotation(robot.pose.rotation.q0_q1_q2_q3)  # Quaternion wrt. current origin
 
             # Yield control
             await asyncio.sleep(0)
+
+    async def robot_main(self, conn: cozmo.conn.CozmoConnection):
+        """
+        This is the main coroutine for a robot.
+
+        :param conn The Cozmo SDK connection
+        :return:
+        """
+
+        # Get its robot interface
+        robot: cozmo.robot.Robot = await conn.wait_for_robot()
+
+        # Create server instance for this robot
+        server = base.Server(robot_id=robot.robot_id, robot_serial=robot.serial)
+
+        # Built a list of tasks to run concurrently for this robot
+        tasks = []
+        tasks += self.face_loop(robot, server)
+        tasks += self.sensor_monitor(robot, server)
+
+        # Wait on all of them
+        await asyncio.gather(tasks)
 
     def main(self, args: dict) -> int:
         """
@@ -76,14 +109,17 @@ class EntryPointInteract(EntryPoint):
         # Get event loop for this thread
         loop = asyncio.get_event_loop()
 
-        # Call our demo coroutines and set them up for running on the loop
-        future_demo_video = asyncio.ensure_future(self.demo_video(), loop=loop)
-        future_demo_faces = asyncio.ensure_future(self.demo_faces(), loop=loop)
+        # TODO: Set up these things for each connected Cozmo
+        #   Right now, only one Cozmo is dealt with
 
-        # Bundle the coroutines together so we can treat them like one
-        future_demo = asyncio.gather(future_demo_video, future_demo_faces)
+        # Connect to first available app
+        conn = cozmo.connect_on_loop(loop)
 
-        # Run the loop until the demo is done
-        # This blocks on the main thread of the program
-        loop.run_until_complete(future_demo)
+        # Run the Cozmo main function
+        loop.run_until_complete(asyncio.ensure_future(self.robot_main(conn)))
         return 0
+
+
+# Don't drive off the charger as soon as we connect
+# This would cause both Cozmos to drive forward on program start
+cozmo.robot.Robot.drive_off_charger_on_connect = False

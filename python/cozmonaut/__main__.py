@@ -20,7 +20,7 @@ def test_friend_list():
         'sql_data': 'database',
     }
 
-    test_args_1 = {
+    test_args_2 = {
         'friend_id': 100,
         'sql_host': 'hostname',
         'sql_user': 'username',
